@@ -27,6 +27,7 @@ func main() {
 		0xFF, // Data
 	}
 
+	// From https://css.bz/2016/12/08/go-raw-sockets.html
 	// Socket is defined as:
 	// func Socket(domain, typ, proto int) (fd int, err error)
 	// Domain specifies the protocol family to be used - this should be AF_PACKET
@@ -34,16 +35,22 @@ func main() {
 	// Type specifies the semantics of the socket
 	// Protocol specifies the protocol to use - kept here as ETH_P_ALL to
 	// indicate all protocols over Ethernet
-	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW,
-		syscall.ETH_P_ALL) // ETH_P_ALL works for Linux/Unix so may show as undefined on Windows
-	if err != nil {
-		fmt.Println("Error1: " + err.Error())
-		return
-	}
-	fmt.Println("Obtained fd ", fd)
-	defer syscall.Close(fd)
+	/*
+		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW,
+			syscall.ETH_P_ALL) // ETH_P_ALL works for Linux/Unix so may show as undefined on Windows
+		if err != nil {
+			fmt.Println("Error1: " + err.Error())
+			return
+		}
+		fmt.Println("Obtained fd ", fd)
+	*/
 
 	// From https://stackoverflow.com/questions/35841275/sending-raw-packet-with-ethernet-header-using-go-language
+	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.ETH_P_ALL)
+	if err != nil {
+		fmt.Println("Error1: " + err.Error())
+	}
+
 	if_info, err := net.InterfaceByName("enp7s0")
 	if err != nil {
 		fmt.Println("Error2: " + err.Error())
