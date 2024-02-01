@@ -44,7 +44,7 @@ func main() {
 	defer syscall.Close(fd)
 
 	// From https://stackoverflow.com/questions/35841275/sending-raw-packet-with-ethernet-header-using-go-language
-	if_info, err := net.InterfaceByName("eth0")
+	if_info, err := net.InterfaceByName("enp7s0")
 	if err != nil {
 		fmt.Println("Error2: " + err.Error())
 	}
