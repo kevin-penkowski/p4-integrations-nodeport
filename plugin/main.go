@@ -71,7 +71,7 @@ func main() {
 		fmt.Println("Error3: " + err.Error())
 	}
 
-	err = syscall.SetLsfPromisc("eth0", true)
+	err = syscall.SetLsfPromisc("enp7s0", true) // TODO: What does this do?
 	if err != nil {
 		fmt.Println("Error4: " + err.Error())
 	}
@@ -85,7 +85,7 @@ func main() {
 		fmt.Println(n)
 	}
 
-	err = syscall.SetLsfPromisc("eth0", false)
+	err = syscall.SetLsfPromisc("enp7s0", false)
 	if err != nil {
 		fmt.Println("Error6: " + err.Error())
 	}
