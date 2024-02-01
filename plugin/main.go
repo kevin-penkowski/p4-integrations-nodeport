@@ -51,6 +51,7 @@ func main() {
 
 	var haddr [8]byte
 	copy(haddr[0:7], if_info.HardwareAddr[0:7])
+	fmt.Println(haddr)
 	addr := syscall.SockaddrLinklayer{
 		Protocol: syscall.ETH_P_IP,
 		Ifindex:  if_info.Index,
@@ -83,4 +84,16 @@ func main() {
 	}
 
 	syscall.Close(fd)
+	/*
+		if_info, err := net.InterfaceByName("Local Area Connection* 1")
+		if err != nil {
+			fmt.Println("Error2: " + err.Error())
+			return
+		}
+
+		var haddr [8]byte
+		fmt.Println((if_info.HardwareAddr))
+		fmt.Println((if_info.HardwareAddr[0:6]))
+		copy(haddr[0:7], if_info.HardwareAddr[0:6])
+	*/
 }
