@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 )
 
 func main() {
@@ -25,8 +26,37 @@ func main() {
 	// Get command output as byte array
 	ips := stdout
 	fmt.Println(string(ips))
-	fmt.Println(ips)
+	ips_string_arr := strings.Split(string(ips), "\n")
+	payload := []byte{}
+	for i := 0; i < len(ips_string_arr); i++ {
+		payload = append(payload, net.ParseIP(ips_string_arr[i])...)
+	}
+	fmt.Println(payload)
+	//establish connection
+	connection, err := net.Dial("udp", "10.0.0.1:30000")
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	// send IPs packet
+	_, err = connection.Write(payload)
+	if err != nil {
+		fmt.Println("Error sending:", err.Error())
+		return
+	}
+	fmt.Println("Sent: ", string(payload))
+	defer connection.Close()
 
+	/*
+		// Receive packets
+		buffer := make([]byte, 1024)
+		mLen, err := connection.Read(buffer)
+			if err != nil {
+				fmt.Println("Error reading:", err.Error())
+			}
+			fmt.Println("Received: ", string(buffer[:mLen]))
+			defer connection.Close()
+	*/
 	/*
 		// Raw packet construction
 		// Construct a packet to send
@@ -48,32 +78,6 @@ func main() {
 		}
 		// Append the public IPs to the packet as the payload
 		pkt = append(pkt, ips...)
-	*/
-
-	//establish connection
-	connection, err := net.Dial("udp", "localhost:9988")
-	if err != nil {
-		fmt.Println(err.Error())
-		return
-	}
-	///send some data
-	_, err = connection.Write(ips)
-	if err != nil {
-		fmt.Println("Error sending:", err.Error())
-		return
-	}
-	fmt.Println("Sent: ", string(ips))
-	defer connection.Close()
-
-	/*
-		// Receive packets
-		buffer := make([]byte, 1024)
-		mLen, err := connection.Read(buffer)
-		if err != nil {
-			fmt.Println("Error reading:", err.Error())
-		}
-		fmt.Println("Received: ", string(buffer[:mLen]))
-		defer connection.Close()
 	*/
 
 	// ----------------- Week 3 -----------------
