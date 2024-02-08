@@ -10,22 +10,27 @@ import (
 
 func main() {
 
-	cmd := exec.Command("echo", "Hello, World!")
-	stdout, err := cmd.Output()
-	if err != nil {
-		fmt.Println(err.Error())
+	command_get_pod_count := strings.Split("kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\n' | sort | awk ", " ")
+	command_get_pod_count = append(command_get_pod_count, "'{print $2 \"\t\" $1}'") // Append this separately to avoid splitting it
+
+	command_get_node_ips := strings.Split("kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk", " ")
+	command_get_node_ips = append(command_get_node_ips, "'{print $2}'") // Append this separately to avoid splitting it
+	command_get_node_ips = append(command_get_node_ips, strings.Split("| paste - -", " ")...)
+
+	cmd_get_pod_count := exec.Command(command_get_pod_count[0], command_get_pod_count[1:]...)
+	stdout1, err1 := cmd_get_pod_count.Output()
+	if err1 != nil {
+		fmt.Println(err1.Error())
 		return
 	}
+	fmt.Println(string(stdout1))
 
-	fmt.Println(string(stdout))
-	command := strings.Split("for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\\n' | sort | awk '{print $2 \"\\t\" $1}'); do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; done", " ")
-	cmd_get_node_ips := exec.Command(command[0], command[1:]...)
+	cmd_get_node_ips := exec.Command(command_get_node_ips[0], command_get_node_ips[1:]...)
 	stdout2, err2 := cmd_get_node_ips.Output()
-	if err2 != nil {
+	if err1 != nil {
 		fmt.Println(err2.Error())
 		return
 	}
-
 	fmt.Println(string(stdout2))
 
 	// Construct a packet to send
