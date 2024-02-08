@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -17,8 +18,8 @@ func main() {
 	}
 
 	fmt.Println(string(stdout))
-
-	cmd_get_node_ips := exec.Command("kubectl get pod -o wide")
+	command := strings.Split("for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\\n' | sort | awk '{print $2 \"\\t\" $1}'); do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; done", " ")
+	cmd_get_node_ips := exec.Command(command[0], command[1:]...)
 	stdout2, err2 := cmd_get_node_ips.Output()
 	if err2 != nil {
 		fmt.Println(err2.Error())
