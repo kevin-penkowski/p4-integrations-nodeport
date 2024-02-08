@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	
+
 	cmd := exec.Command("echo", "Hello, World!")
 	stdout, err := cmd.Output()
 	if err != nil {
@@ -18,16 +18,14 @@ func main() {
 
 	fmt.Println(string(stdout))
 
-	cmd_get_node_ips := exec.Command("for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\n' | sort | awk '{print $2 \"\t\" $1}'); 
-	do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; 
-	done")
-	stdout, err := cmd_get_node_ips.Output()
-	if err != nil {
-		fmt.Println(err.Error())
+	cmd_get_node_ips := exec.Command("for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\\n' | sort | awk '{print $2 \"\\t\" $1}'); do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; done")
+	stdout2, err2 := cmd_get_node_ips.Output()
+	if err2 != nil {
+		fmt.Println(err2.Error())
 		return
 	}
 
-	fmt.Println(string(stdout))
+	fmt.Println(string(stdout2))
 
 	// Construct a packet to send
 	pkt := []byte{
