@@ -3,10 +3,31 @@ package main
 import (
 	"fmt"
 	"net"
+	"os/exec"
 	"syscall"
 )
 
 func main() {
+	
+	cmd := exec.Command("echo", "Hello, World!")
+	stdout, err := cmd.Output()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	fmt.Println(string(stdout))
+
+	cmd_get_node_ips := exec.Command("for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" | tr -s '[[:space:]]' '\n' | sort | awk '{print $2 \"\t\" $1}'); 
+	do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' | awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; 
+	done")
+	stdout, err := cmd_get_node_ips.Output()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	fmt.Println(string(stdout))
 
 	// Construct a packet to send
 	pkt := []byte{
@@ -22,28 +43,11 @@ func main() {
 		0x0a, 0x00, 0x00, 0x02, // Destination IP (10.0.0.1)
 		// UDP header = 8 bytes
 		0x75, 0x30, 0x75, 0x30, // Source Port (30000), Destination Port (30000), TODO: Subject to change
-		0x00, 0x9, 0x6b, 0xeb, // Length, Checksum
-		// Payload
+		0x00, 0x09, 0x6b, 0xeb, // Length, Checksum
+		// Payload = 1 byte
 		0xFF, // Data
+		// Total length = 43 bytes
 	}
-
-	// From https://css.bz/2016/12/08/go-raw-sockets.html
-	// Socket is defined as:
-	// func Socket(domain, typ, proto int) (fd int, err error)
-	// Domain specifies the protocol family to be used - this should be AF_PACKET
-	// to indicate we want the low level packet interface
-	// Type specifies the semantics of the socket
-	// Protocol specifies the protocol to use - kept here as ETH_P_ALL to
-	// indicate all protocols over Ethernet
-	/*
-		fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW,
-			syscall.ETH_P_ALL) // ETH_P_ALL works for Linux/Unix so may show as undefined on Windows
-		if err != nil {
-			fmt.Println("Error1: " + err.Error())
-			return
-		}
-		fmt.Println("Obtained fd ", fd)
-	*/
 
 	// From https://stackoverflow.com/questions/35841275/sending-raw-packet-with-ethernet-header-using-go-language
 	fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.ETH_P_ALL)
@@ -91,16 +95,4 @@ func main() {
 	}
 
 	syscall.Close(fd)
-	/*
-		if_info, err := net.InterfaceByName("Local Area Connection* 1")
-		if err != nil {
-			fmt.Println("Error2: " + err.Error())
-			return
-		}
-
-		var haddr [8]byte
-		fmt.Println((if_info.HardwareAddr))
-		fmt.Println((if_info.HardwareAddr[0:6]))
-		copy(haddr[0:7], if_info.HardwareAddr[0:6])
-	*/
 }
