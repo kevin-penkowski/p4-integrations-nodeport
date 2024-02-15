@@ -41,7 +41,7 @@ func main() {
 	// Convert integer port to bytes
 	fmt.Println("Port number:", port)
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, port)
+	binary.Write(buf, binary.BigEndian, port)
 	port_bytes := buf.Bytes()[len(buf.Bytes())-2 : len(buf.Bytes())] // Get the last 2 bytes
 	// Create array of strings of IP addresses
 	fmt.Println("IPs:\n" + string(ips))
