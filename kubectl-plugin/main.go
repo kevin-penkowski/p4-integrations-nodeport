@@ -1,15 +1,16 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
 func main() {
-	// ----------------- Week 4 -----------------
-
 	// Get the public IPs of the nodes with count of number of pods running on each node
 	// Create a string bash command
 	kube_cmd_ips := "for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" " +
@@ -26,23 +27,42 @@ func main() {
 	ips := stdout
 	// Get the NodePort port number of the service
 	kube_cmd_port := "kubectl get svc --all-namespaces -o " +
-		"go-template='{{range .items}}{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{\"\\n\"}}{{end}}{{end}}{{end}}'"
+		"go-template='{{range .items}}{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{\"\"}}{{end}}{{end}}{{end}}'"
 	get_port_command := exec.Command("bash", "-c", kube_cmd_port)
 	stdout, err = get_port_command.Output()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	port := stdout // <- Is a byte array of the string of the port number
-	fmt.Println(port)
-	fmt.Println(string(port))
-	// Get command output as byte array
-	fmt.Println(string(ips))
+	port, err_port := strconv.ParseInt(string(stdout), 10, 64) // <- Convert string (in bytes) to int64
+	if err_port != nil {
+		panic(err_port)
+	}
+	// Convert integer port to bytes
+	fmt.Println("Port number:", port)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, port)
+	port_bytes := buf.Bytes()[:2]
+	// Create array of strings of IP addresses
+	fmt.Println("IPs:\n" + string(ips))
 	ips_string_arr := strings.Split(string(ips), "\n")
+	// Convert length of IP address to bytes
+	buf = new(bytes.Buffer)
+	num_replicas := int64(len(ips_string_arr) - 1) // Minus 1 for an extra newline
+	fmt.Println("Number of Replicas:", num_replicas)
+	err_write := binary.Write(buf, binary.LittleEndian, num_replicas)
+	if err_write != nil {
+		panic(err_write)
+	}
+	num_replicas_bytes := buf.Bytes()[:2]
+	// Create payload
 	payload := []byte{}
-	payload = append(payload, port...)
-	for i := 0; i < len(ips_string_arr); i++ {
-		payload = append(payload, net.ParseIP(ips_string_arr[i])...)
+	payload = append(payload, port_bytes...)
+	payload = append(payload, num_replicas_bytes...)
+	for i := 0; i < len(ips_string_arr)-1; i++ {
+		bytes_ip := []byte{4}
+		bytes_ip = net.ParseIP(ips_string_arr[i])[12:16]
+		payload = append(payload, bytes_ip...)
 	}
 	//establish connection
 	connection, err := net.Dial("udp", "10.0.0.1:30000")
@@ -58,87 +78,4 @@ func main() {
 	}
 	fmt.Println("Sent: ", payload)
 	defer connection.Close()
-
-	/*
-		// Receive packets
-		buffer := make([]byte, 1024)
-		mLen, err := connection.Read(buffer)
-			if err != nil {
-				fmt.Println("Error reading:", err.Error())
-			}
-			fmt.Println("Received: ", string(buffer[:mLen]))
-			defer connection.Close()
-	*/
-	/*
-		// Raw packet construction
-		// Construct a packet to send
-		pkt := []byte{
-			// Ethernet header = 14 bytes
-			0x12, 0x65, 0x6b, 0x54, 0xCB, 0x90, // Destination MAC (12:65:6B:54:CB:90)
-			0x16, 0x9b, 0x47, 0x4e, 0x47, 0x4c, // Source MAC (16:9B:47:4E:47:4C)
-			0x08, 0x00, // Type = IP
-			// IP header = 20 bytes
-			0x45, 0x00, 0x00, 0x3c, // Version, IHL, TOS, Length TODO: Edit length
-			0x47, 0xd9, 0x40, 0x00, // ID, Flags, Fragment Offset
-			0x40, 0x06, 0xb5, 0x94, // TTL, Protocol, Header Checksum
-			0x0a, 0x00, 0x00, 0x01, // Source IP (10.0.0.2)
-			0x0a, 0x00, 0x00, 0x02, // Destination IP (10.0.0.1)
-			// UDP header = 8 bytes
-			0x75, 0x30, 0x75, 0x30, // Source Port (30000), Destination Port (30000), TODO: Subject to change
-			0x00, byte(len(ips)), 0x6b, 0xeb, // Length, Checksum
-			// Total length = 42 + length of ips bytes
-		}
-		// Append the public IPs to the packet as the payload
-		pkt = append(pkt, ips...)
-	*/
-
-	// ----------------- Week 3 -----------------
-	/*
-		// From https://stackoverflow.com/questions/35841275/sending-raw-packet-with-ethernet-header-using-go-language
-		fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, syscall.ETH_P_ALL)
-		if err != nil {
-			fmt.Println("Error1: " + err.Error())
-		}
-
-		if_info, err := net.InterfaceByName("enp7s0")
-		if err != nil {
-			fmt.Println("Error2: " + err.Error())
-		}
-
-		var haddr [8]byte
-		copy(haddr[0:7], if_info.HardwareAddr[0:7])
-		fmt.Println(haddr)
-		addr := syscall.SockaddrLinklayer{
-			Protocol: syscall.ETH_P_IP,
-			Ifindex:  if_info.Index,
-			Halen:    uint8(len(if_info.HardwareAddr)),
-			Addr:     haddr,
-		}
-
-		err = syscall.Bind(fd, &addr)
-		if err != nil {
-			fmt.Println("Error3: " + err.Error())
-		}
-
-		err = syscall.SetLsfPromisc("enp7s0", true) // TODO: What does this do?
-		if err != nil {
-			fmt.Println("Error4: " + err.Error())
-		}
-
-		n, err := syscall.Write(fd, pkt)
-		if err != nil {
-			fmt.Println("Error5: " + err.Error())
-			fmt.Println(n)
-		} else {
-			fmt.Println("Packet is sent.")
-			fmt.Println(n)
-		}
-
-		err = syscall.SetLsfPromisc("enp7s0", false)
-		if err != nil {
-			fmt.Println("Error6: " + err.Error())
-		}
-
-		syscall.Close(fd)
-	*/
 }
