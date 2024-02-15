@@ -12,26 +12,38 @@ func main() {
 
 	// Get the public IPs of the nodes with count of number of pods running on each node
 	// Create a string bash command
-	kube_cmd := "for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" " +
+	kube_cmd_ips := "for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" " +
 		"| tr -s '[[:space:]]' '\\n' | sort | awk '{print $2\"\\t\"$1}'); " +
 		"do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' " +
 		"| awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; done | tr -s '[[:space:]]' '\n'"
 	// Execute the bash command
-	test_command := exec.Command("bash", "-c", kube_cmd)
-	stdout, err := test_command.Output()
+	get_ips_command := exec.Command("bash", "-c", kube_cmd_ips)
+	stdout, err := get_ips_command.Output()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	// Get command output as byte array
 	ips := stdout
+	// Get the NodePort port number of the service
+	kube_cmd_port := "kubectl get svc --all-namespaces -o " +
+		"go-template='{{range .items}}{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{\"\\n\"}}{{end}}{{end}}{{end}}'"
+	get_port_command := exec.Command("bash", "-c", kube_cmd_port)
+	stdout, err = get_port_command.Output()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	port := stdout // <- Is a byte array of the string of the port number
+	fmt.Println(port)
+	fmt.Println(string(port))
+	// Get command output as byte array
 	fmt.Println(string(ips))
 	ips_string_arr := strings.Split(string(ips), "\n")
 	payload := []byte{}
+	payload = append(payload, port...)
 	for i := 0; i < len(ips_string_arr); i++ {
 		payload = append(payload, net.ParseIP(ips_string_arr[i])...)
 	}
-	fmt.Println(payload)
 	//establish connection
 	connection, err := net.Dial("udp", "10.0.0.1:30000")
 	if err != nil {
@@ -44,7 +56,7 @@ func main() {
 		fmt.Println("Error sending:", err.Error())
 		return
 	}
-	fmt.Println("Sent: ", string(payload))
+	fmt.Println("Sent: ", payload)
 	defer connection.Close()
 
 	/*
