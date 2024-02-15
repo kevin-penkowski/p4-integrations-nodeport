@@ -15,7 +15,7 @@ func main() {
 	// Create a string bash command
 	kube_cmd_ips := "for NODE in $(kubectl get pods -o jsonpath=\"{..nodeName}\" " +
 		"| tr -s '[[:space:]]' '\\n' | sort | awk '{print $2\"\\t\"$1}'); " +
-		"do kubectl describe nodes | grep 'Name:\\|flannel.alpha.coreos.com/public-ip' " +
+		"do kubectl describe nodes | grep 'Name:\\|public-ip' " +
 		"| awk '{print $2}' | paste - - | grep $NODE | awk '{print $2}'; done | tr -s '[[:space:]]' '\n'"
 	// Execute the bash command
 	get_ips_command := exec.Command("bash", "-c", kube_cmd_ips)
@@ -42,7 +42,7 @@ func main() {
 	fmt.Println("Port number:", port)
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, port)
-	port_bytes := buf.Bytes()[:2]
+	port_bytes := buf.Bytes()[len(buf.Bytes())-2 : len(buf.Bytes())] // Get the last 2 bytes
 	// Create array of strings of IP addresses
 	fmt.Println("IPs:\n" + string(ips))
 	ips_string_arr := strings.Split(string(ips), "\n")
@@ -50,11 +50,12 @@ func main() {
 	buf = new(bytes.Buffer)
 	num_replicas := int64(len(ips_string_arr) - 1) // Minus 1 for an extra newline
 	fmt.Println("Number of Replicas:", num_replicas)
-	err_write := binary.Write(buf, binary.LittleEndian, num_replicas)
+	err_write := binary.Write(buf, binary.BigEndian, num_replicas)
 	if err_write != nil {
 		panic(err_write)
 	}
-	num_replicas_bytes := buf.Bytes()[:2]
+	num_replicas_bytes := buf.Bytes()[len(buf.Bytes())-2 : len(buf.Bytes())] // Get the last 2 bytes
+
 	// Create payload
 	payload := []byte{}
 	payload = append(payload, port_bytes...)
@@ -65,7 +66,7 @@ func main() {
 		payload = append(payload, bytes_ip...)
 	}
 	//establish connection
-	connection, err := net.Dial("udp", "10.0.0.1:30000")
+	connection, err := net.Dial("udp", "10.0.0.1:7777")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
