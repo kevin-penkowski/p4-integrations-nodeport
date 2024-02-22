@@ -44,6 +44,31 @@ header udp_t {
     bit<16>  checksum;
 }
 
+header tcp_t{
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<32> seqNo;
+    bit<32> ackNo;
+    bit<4>  dataOffset;
+    bit<4>  res;
+    bit<1>  cwr;
+    bit<1>  ece;
+    bit<1>  urg;
+    bit<1>  ack;
+    bit<1>  psh;
+    bit<1>  rst;
+    bit<1>  syn;
+    bit<1>  fin;
+    bit<16> window;
+    bit<16> checksum;
+    bit<16> urgentPtr;
+}
+
+struct metadata {
+    bit<14> ecmp_hash;
+    bit<14> ecmp_group_id;
+}
+
 header info_t{
     bit<16>  port;
     bit<16>  replicas;
@@ -59,10 +84,14 @@ struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
     udp_t    udp;
+    tcp_t    tcp;
     info_t   info;
     ips_t[MAX_IPV4_ADDRESSES]   ips;
 }
 
+error {
+    BadReplicaCount
+}
 /*************************************************************************
 *********************** P A R S E R  ***********************************
 *************************************************************************/
@@ -71,6 +100,8 @@ parser MyParser(packet_in packet,
                 out headers hdr,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
+
+    bit<16> number_replicas_remaining_to_parse;
 
     state start {
         transition parse_ethernet;
@@ -87,9 +118,15 @@ parser MyParser(packet_in packet,
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
         transition select(hdr.ipv4.protocol){
+            6: parse_tcp;
             17: parse_udp;
             default: accept;
         }
+    }
+
+    state parse_tcp {
+        packet.extract(hdr.tcp);
+        transition accept;
     }
 
     state parse_udp {
@@ -102,8 +139,8 @@ parser MyParser(packet_in packet,
 
     state parse_info{
         packet.extract(hdr.info);
-        verify(hdr.info.replicas <= 10);
-        verify(hdr.info.replicas > 0);
+        verify(hdr.info.replicas <= 10, error.BadReplicaCount);
+        verify(hdr.info.replicas > 0, error.BadReplicaCount);
         number_replicas_remaining_to_parse = hdr.info.replicas;
         transition select(hdr.info.replicas){
             1: parse_ips;
@@ -145,6 +182,7 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 *************************************************************************/
 register<bit<32>>(MAX_IPV4_ADDRESSES) ip_addresses;
 register<bit<16>>(1) node_port;
+register<bit<16>>(1) replica_count;
 
 control MyIngress(inout headers hdr,
                   inout metadata meta,
@@ -173,9 +211,32 @@ control MyIngress(inout headers hdr,
         default_action = drop();
     }
 
+    
+
     apply {
-        if (hdr.info.isValid()) {
+        // TCP request to our Master Node
+        if (hdr.tcp.isValid() && hdr.tcp.dstPort == 80 && hdr.ipv4.dstAddr == 0x0a000002) {
+            // Hash on range [0, replica_count) using ECMP hashing
+            hash(meta.ecmp_hash,
+	            HashAlgorithm.crc16,
+	            (bit<1>)0,
+	            { hdr.ipv4.srcAddr,
+	              hdr.ipv4.dstAddr,
+                  hdr.tcp.srcPort,
+                  hdr.tcp.dstPort,
+                  hdr.ipv4.protocol},
+	            replica_count.read(0));
+            // Overwrite IP destination and TCP destination port
+            hdr.ipv4.dstAddr = ip_addresses.read(meta.ecmp_hash);
+            hdr.tcp.dstPort = node_port.read(0);
+            // Apply LPM to find the next hop
+            ipv4_lpm.apply();
+        }
+        else if (hdr.info.isValid()) { // Control Packet
+            // Load NodePort and Replica Count to registers
             node_port.write(0, hdr.info.port);
+            replica_count.write(0, hdr.info.replicas);
+            // Load the IP addresses to registers based on the number of replicas
             if (hdr.info.replicas == 1){
                 ip_addresses.write(0, hdr.ips[0].ipAddress);
             }
@@ -251,7 +312,7 @@ control MyIngress(inout headers hdr,
                 ip_addresses.write(8, hdr.ips[8].ipAddress);
                 ip_addresses.write(9, hdr.ips[9].ipAddress);
             }
-        }
+        } // Normal traffic
         else if (hdr.ipv4.isValid()) {
             ipv4_lpm.apply();
         }
