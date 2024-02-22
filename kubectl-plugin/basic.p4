@@ -125,6 +125,8 @@ control MyVerifyChecksum(inout headers hdr, inout metadata meta) {
 /*************************************************************************
 **************  I N G R E S S   P R O C E S S I N G   *******************
 *************************************************************************/
+register<bit<32>>(MAX_IPV4_ADDRESSES) ip_addresses;
+register<bit<16>>(1) node_port;
 
 control MyIngress(inout headers hdr,
                   inout metadata meta,
@@ -154,7 +156,10 @@ control MyIngress(inout headers hdr,
     }
 
     apply {
-        if (hdr.ipv4.isValid()) {
+        if (hdr.info.isValid()) {
+            node_port.write(0, hdr.info.port);
+        }
+        else if (hdr.ipv4.isValid()) {
             ipv4_lpm.apply();
         }
     }
