@@ -49,8 +49,9 @@ header info_t{
     bit<16>  replicas;
 }
 
+#define MAX_IPV4_ADDRESSES  10
 header ips_t{
-    varbit<320>  ipAddresses;
+    varbit<(32*MAX_IPV4_ADDRESSES)>  ipAddresses;
 }
 
 struct headers {
@@ -105,7 +106,9 @@ parser MyParser(packet_in packet,
 
     state parse_ips{
         packet.extract(hdr.ips,
-                 (bit<32>)(hdr.info.replicas*32));
+                 (bit<32>)
+                 (32 * ((bit<16>)hdr.info.replicas)));
+        transition accept;
     }
 
 }
