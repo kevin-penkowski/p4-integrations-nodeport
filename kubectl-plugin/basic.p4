@@ -227,7 +227,7 @@ control MyIngress(inout headers hdr,
                   hdr.ipv4.protocol},
 	            num_groups);
             // Overwrite IP destination and TCP destination port
-            ip_addresses.read(hdr.ipv4.dstAddr, meta.ecmp_hash);
+            ip_addresses.read(hdr.ipv4.dstAddr, (bit<32>)meta.ecmp_hash);
             node_port.read(hdr.tcp.dstPort, 0);
             // Apply LPM to find the next hop
             ipv4_lpm.apply();
