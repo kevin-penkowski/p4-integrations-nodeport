@@ -33,10 +33,6 @@ header ipv4_t {
     ip4Addr_t dstAddr;
 }
 
-struct metadata {
-    /* empty */
-}
-
 header udp_t {
     bit<16>  srcPort;
     bit<16>  dstPort;
