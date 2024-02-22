@@ -50,8 +50,9 @@ header info_t{
 }
 
 #define MAX_IPV4_ADDRESSES  10
+
 header ips_t{
-    varbit<(32*MAX_IPV4_ADDRESSES)>  ipAddresses;
+    bit<32>  ipAddress;
 }
 
 struct headers {
@@ -59,7 +60,7 @@ struct headers {
     ipv4_t       ipv4;
     udp_t    udp;
     info_t   info;
-    ips_t    ips;
+    ips_t[MAX_IPV4_ADDRESSES]   ips;
 }
 
 /*************************************************************************
@@ -101,14 +102,31 @@ parser MyParser(packet_in packet,
 
     state parse_info{
         packet.extract(hdr.info);
-        transition parse_ips;
+        verify(hdr.info.replicas <= 10);
+        verify(hdr.info.replicas > 0);
+        number_replicas_remaining_to_parse = hdr.info.replicas;
+        transition select(hdr.info.replicas){
+            1: parse_ips;
+            2: parse_ips;
+            3: parse_ips;
+            4: parse_ips;
+            5: parse_ips;
+            6: parse_ips;
+            7: parse_ips;
+            8: parse_ips;
+            9: parse_ips;
+            10: parse_ips;
+            default: accept;
+        }
     }
 
     state parse_ips{
-        packet.extract(hdr.ips,
-                 (bit<32>)
-                 (32 * ((bit<16>)hdr.info.replicas)));
-        transition accept;
+        packet.extract(hdr.ips.next);
+        number_replicas_remaining_to_parse = number_replicas_remaining_to_parse - 1;
+        transition select(number_replicas_remaining_to_parse){
+            0: accept;
+            default: parse_ips;
+        }
     }
 
 }
@@ -159,79 +177,79 @@ control MyIngress(inout headers hdr,
         if (hdr.info.isValid()) {
             node_port.write(0, hdr.info.port);
             if (hdr.info.replicas == 1){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
             }
             if (hdr.info.replicas == 2){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
             }
             if (hdr.info.replicas == 3){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
             }
             if (hdr.info.replicas == 4){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
             }
             if (hdr.info.replicas == 5){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
             }
             if (hdr.info.replicas == 6){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
-                ip_addresses.write(5, hdr.ips.ipAddresses[160:192]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
+                ip_addresses.write(5, hdr.ips[5].ipAddress);
             }
             if (hdr.info.replicas == 7){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
-                ip_addresses.write(5, hdr.ips.ipAddresses[160:192]);
-                ip_addresses.write(6, hdr.ips.ipAddresses[192:224]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
+                ip_addresses.write(5, hdr.ips[5].ipAddress);
+                ip_addresses.write(6, hdr.ips[6].ipAddress);
             }
             if (hdr.info.replicas == 8){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
-                ip_addresses.write(5, hdr.ips.ipAddresses[160:192]);
-                ip_addresses.write(6, hdr.ips.ipAddresses[192:224]);
-                ip_addresses.write(7, hdr.ips.ipAddresses[224:256]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
+                ip_addresses.write(5, hdr.ips[5].ipAddress);
+                ip_addresses.write(6, hdr.ips[6].ipAddress);
+                ip_addresses.write(7, hdr.ips[7].ipAddress);
             }
             if (hdr.info.replicas == 9){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
-                ip_addresses.write(5, hdr.ips.ipAddresses[160:192]);
-                ip_addresses.write(6, hdr.ips.ipAddresses[192:224]);
-                ip_addresses.write(7, hdr.ips.ipAddresses[224:256]);
-                ip_addresses.write(8, hdr.ips.ipAddresses[256:288]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
+                ip_addresses.write(5, hdr.ips[5].ipAddress);
+                ip_addresses.write(6, hdr.ips[6].ipAddress);
+                ip_addresses.write(7, hdr.ips[7].ipAddress);
+                ip_addresses.write(8, hdr.ips[8].ipAddress);
             }
             if (hdr.info.replicas == 10){
-                ip_addresses.write(0, hdr.ips.ipAddresses[0:32]);
-                ip_addresses.write(1, hdr.ips.ipAddresses[32:64]);
-                ip_addresses.write(2, hdr.ips.ipAddresses[64:96]);
-                ip_addresses.write(3, hdr.ips.ipAddresses[96:128]);
-                ip_addresses.write(4, hdr.ips.ipAddresses[128:160]);
-                ip_addresses.write(5, hdr.ips.ipAddresses[160:192]);
-                ip_addresses.write(6, hdr.ips.ipAddresses[192:224]);
-                ip_addresses.write(7, hdr.ips.ipAddresses[224:256]);
-                ip_addresses.write(8, hdr.ips.ipAddresses[256:288]);
-                ip_addresses.write(9, hdr.ips.ipAddresses[288:320]);
+                ip_addresses.write(0, hdr.ips[0].ipAddress);
+                ip_addresses.write(1, hdr.ips[1].ipAddress);
+                ip_addresses.write(2, hdr.ips[2].ipAddress);
+                ip_addresses.write(3, hdr.ips[3].ipAddress);
+                ip_addresses.write(4, hdr.ips[4].ipAddress);
+                ip_addresses.write(5, hdr.ips[5].ipAddress);
+                ip_addresses.write(6, hdr.ips[6].ipAddress);
+                ip_addresses.write(7, hdr.ips[7].ipAddress);
+                ip_addresses.write(8, hdr.ips[8].ipAddress);
+                ip_addresses.write(9, hdr.ips[9].ipAddress);
             }
         }
         else if (hdr.ipv4.isValid()) {
