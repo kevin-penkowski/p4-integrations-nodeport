@@ -185,6 +185,7 @@ control MyIngress(inout headers hdr,
                   inout standard_metadata_t standard_metadata) {
 
     bit<16> num_groups;
+    bit<16> priv_port;
 
     action drop() {
         mark_to_drop(standard_metadata);
@@ -213,6 +214,7 @@ control MyIngress(inout headers hdr,
     
 
     apply {
+        node_port.read(priv_port, 0);
         // TCP request to our Master Node
         if (hdr.tcp.isValid() && hdr.tcp.dstPort == 80 && hdr.ipv4.dstAddr == 0x0a000002) {
             // Hash on range [0, replica_count) using ECMP hashing
@@ -229,6 +231,13 @@ control MyIngress(inout headers hdr,
             // Overwrite IP destination and TCP destination port
             ip_addresses.read(hdr.ipv4.dstAddr, (bit<32>)meta.ecmp_hash);
             node_port.read(hdr.tcp.dstPort, 0);
+            // Apply LPM to find the next hop
+            ipv4_lpm.apply();
+        }
+        else if (hdr.tcp.isValid() && hdr.tcp.srcPort == priv_port) {
+            // Reverse NAT
+            hdr.tcp.srcPort = 80;
+            hdr.ipv4.srcAddr = 0x0a000002;
             // Apply LPM to find the next hop
             ipv4_lpm.apply();
         }
