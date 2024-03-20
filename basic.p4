@@ -61,8 +61,9 @@ header tcp_t{
 }
 
 struct metadata {
-    bit<14> ecmp_hash;
-    bit<14> ecmp_group_id;
+    bit<14> ecmpHash;
+    bit<14> ecmpGroupId;
+    bit<16> tcpLength;
 }
 
 header info_t{
@@ -113,6 +114,7 @@ parser MyParser(packet_in packet,
 
     state parse_ipv4 {
         packet.extract(hdr.ipv4);
+        meta.tcpLength = hdr.ipv4.totalLen - 20;
         transition select(hdr.ipv4.protocol){
             6: parse_tcp;
             17: parse_udp;
@@ -211,15 +213,13 @@ control MyIngress(inout headers hdr,
         default_action = drop();
     }
 
-    
-
     apply {
         node_port.read(priv_port, 0);
         // TCP request to our Master Node
         if (hdr.tcp.isValid() && hdr.tcp.dstPort == 80 && hdr.ipv4.dstAddr == 0x0a000002) {
             // Hash on range [0, replica_count) using ECMP hashing
             replica_count.read(num_groups, 0);
-            hash(meta.ecmp_hash,
+            hash(meta.ecmpHash,
 	            HashAlgorithm.crc16,
 	            (bit<1>)0,
 	            { hdr.ipv4.srcAddr,
@@ -229,7 +229,7 @@ control MyIngress(inout headers hdr,
                   hdr.ipv4.protocol},
 	            num_groups);
             // Overwrite IP destination and TCP destination port
-            ip_addresses.read(hdr.ipv4.dstAddr, (bit<32>)meta.ecmp_hash);
+            ip_addresses.read(hdr.ipv4.dstAddr, (bit<32>)meta.ecmpHash);
             node_port.read(hdr.tcp.dstPort, 0);
             // Apply LPM to find the next hop
             ipv4_lpm.apply();
@@ -359,6 +359,32 @@ control MyComputeChecksum(inout headers  hdr, inout metadata meta) {
               hdr.ipv4.dstAddr },
             hdr.ipv4.hdrChecksum,
             HashAlgorithm.csum16);
+        
+        update_checksum_with_payload(
+            hdr.tcp.isValid(),
+            { hdr.ipv4.srcAddr,
+              hdr.ipv4.dstAddr,
+              8w0,
+              hdr.ipv4.protocol,
+              meta.tcpLength,
+              hdr.tcp.srcPort,
+              hdr.tcp.dstPort,
+              hdr.tcp.seqNo,
+              hdr.tcp.ackNo,
+              hdr.tcp.dataOffset,
+              hdr.tcp.res,
+              hdr.tcp.cwr,
+              hdr.tcp.ece,
+              hdr.tcp.urg,
+              hdr.tcp.ack,
+              hdr.tcp.psh,
+              hdr.tcp.rst,
+              hdr.tcp.syn,
+              hdr.tcp.fin,
+              hdr.tcp.window,
+              hdr.tcp.urgentPtr },
+            hdr.tcp.checksum,
+            HashAlgorithm.csum16);
     }
 }
 
@@ -370,6 +396,7 @@ control MyDeparser(packet_out packet, in headers hdr) {
     apply {
         packet.emit(hdr.ethernet);
         packet.emit(hdr.ipv4);
+        packet.emit(hdr.tcp);
     }
 }
 
